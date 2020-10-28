@@ -46,6 +46,7 @@ namespace PictureHandler
         private void button2_Click(object sender, EventArgs e)
         {
             //ChangePicture();
+            //Median
             MedianFiltering(bitmap);
         }
 
