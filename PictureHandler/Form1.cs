@@ -1,127 +1,159 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
-using System.Data;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace PictureHandler
 {
     public partial class Form1 : Form
     {
-        private Bitmap bitmap;
-        private long elapsedTimeWorking;
-        private const int indexsColorBlack = 0;
+        private readonly Color _blackColor = Color.FromArgb(0, 0, 0);
+        private Bitmap _bitmap;
+        private long _elapsedTimeWorking;
 
+        /// <summary>
+        /// .ctor
+        /// </summary>
         public Form1()
         {
             InitializeComponent();
-            LoadPicture("smile.jpg");
         }
 
-        private void button1_Click(object sender, EventArgs e)
-        {
-            openFileDialog1.InitialDirectory = Environment.CurrentDirectory;
-            DialogResult dialogResult = openFileDialog1.ShowDialog();
-            LoadPicture(openFileDialog1.FileName);
-        }
+        #region MedianFilteringLogic
 
-        private void LoadPicture(string filename)
+        private void MedianFiltering(Bitmap bitmap)
         {
-            try
+            var stopwatch = Stopwatch.StartNew();
+
+            var redColors = new Collection<byte>();
+            var greenColors = new Collection<byte>();
+            var blueColors = new Collection<byte>();
+
+            // Applying median filtering.
+            for (var i = 0; i <= bitmap.Width - 3; i++)
             {
-                bitmap = new Bitmap(Image.FromFile(filename));
-                textBox1.Text = openFileDialog1.FileName;
-                picture.Image = bitmap;
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(ex.Message);
-                textBox1.Text = "";
-            }
-        }
-
-        private void button2_Click(object sender, EventArgs e)
-        {
-            MedianFiltering(bitmap);
-            elapsedTime.Text = elapsedTimeWorking.ToString();
-        }
-
-        private void MedianFiltering(Bitmap bm)
-        {
-            Stopwatch stopwatch = Stopwatch.StartNew();
-            List<byte> redColors = new List<byte>();
-            List<byte> greenColors = new List<byte>();
-            List<byte> blueColors = new List<byte>();
-
-            // Applying Median Filtering.
-            for (int i = 0; i <= bm.Width - 3; i++)
-            {
-                for (int j = 0; j <= bm.Height - 3; j++)
+                for (var j = 0; j <= bitmap.Height - 3; j++)
                 {
-                    for (int x = i; x <= i + 2; x++)
+                    for (var x = i; x <= i + 2; x++)
                     {
-                        for (int y = j; y <= j + 2; y++)
+                        for (var y = j; y <= j + 2; y++)
                         {
-                            var currentColor = bm.GetPixel(x, y);
+                            var currentColor = bitmap.GetPixel(x, y);
+
                             redColors.Add(currentColor.R);
                             greenColors.Add(currentColor.G);
                             blueColors.Add(currentColor.B);
                         }
                     }
-                    byte[] resultRedColours = redColors.ToArray();
-                    byte[] resultGreenColours = greenColors.ToArray();
-                    byte[] resultBlueColours = blueColors.ToArray();
+
+                    var resultRedColors = redColors.ToArray();
+                    var resultGreenColors = greenColors.ToArray();
+                    var resultBlueColors = blueColors.ToArray();
+
                     redColors.Clear();
                     greenColors.Clear();
                     blueColors.Clear();
-                    Array.Sort<byte>(resultRedColours);
-                    Array.Sort<byte>(resultGreenColours);
-                    Array.Sort<byte>(resultBlueColours);
-                    bm.SetPixel(i + 1, j + 1, Color.FromArgb(
-                        resultRedColours[4],
-                        resultGreenColours[4],
-                        resultBlueColours[4]));
+
+                    Array.Sort(resultRedColors);
+                    Array.Sort(resultGreenColors);
+                    Array.Sort(resultBlueColors);
+
+                    bitmap.SetPixel(i + 1, j + 1,
+                        Color.FromArgb(resultRedColors[4], resultGreenColors[4], resultBlueColors[4]));
                 }
             }
 
-            // Set black color for edge pixels.
-            for (int x = 0; x < bm.Width; x++)
+            // TODO: Duplicate code.
+            //Set black color for edge pixels.
+            for (var index = 0; index < bitmap.Width; index++)
             {
-                bm.SetPixel(x, 0, Color.FromArgb(
-                    indexsColorBlack, indexsColorBlack, indexsColorBlack));
+                bitmap.SetPixel(index, 0, _blackColor);
             }
 
-            for (int x = 0; x < bm.Width; x++)
+            for (var index = 0; index < bitmap.Width; index++)
             {
-                bm.SetPixel(x, bm.Height - 1, Color.FromArgb(
-                    indexsColorBlack, indexsColorBlack, indexsColorBlack));
+                bitmap.SetPixel(index, bitmap.Height - 1, _blackColor);
             }
 
-            for (int y = 0; y < bm.Height; y++)
+            for (var index = 0; index < bitmap.Height; index++)
             {
-                bm.SetPixel(0, y, Color.FromArgb(
-                    indexsColorBlack, indexsColorBlack, indexsColorBlack));
+                bitmap.SetPixel(0, index, _blackColor);
             }
 
-            for (int y = 0; y < bm.Height; y++)
+            for (var index = 0; index < bitmap.Height; index++)
             {
-                bm.SetPixel(bm.Width - 1, y, Color.FromArgb(
-                    indexsColorBlack, indexsColorBlack, indexsColorBlack));
+                bitmap.SetPixel(bitmap.Width - 1, index, _blackColor);
             }
-
-            picture.Image = bm;
 
             stopwatch.Stop();
-            elapsedTimeWorking = stopwatch.ElapsedMilliseconds;
+            _elapsedTimeWorking = stopwatch.ElapsedMilliseconds;
+
+            picture.Image = bitmap;
         }
 
-        private void label1_Click(object sender, EventArgs e)
+        #endregion
+
+        #region FormsEvents
+
+        /// <summary>
+        /// Event to upload image that will be processed.
+        /// </summary>
+        private void Button1_Click(object sender, EventArgs e)
         {
+            openFileDialog1.InitialDirectory = Environment.UserName;
+
+            if (openFileDialog1.ShowDialog() == DialogResult.OK)
+            {
+                LoadPicture(openFileDialog1.FileName);
+            }
         }
+
+        /// <summary>
+        /// Event to start processing the loaded image.
+        /// </summary>
+        private void Button2_Click(object sender, EventArgs eventArgs)
+        {
+            if (_bitmap != null)
+            {
+                errorLabel.Visible = false;
+
+                MedianFiltering(_bitmap);
+
+                elapsedTime.Text = _elapsedTimeWorking.ToString();
+            }
+            else
+            {
+                errorLabel.Visible = true;
+            }
+        }
+
+        #endregion
+
+        #region HelperMethods
+
+        /// <summary>
+        /// Method that uploads image that will be processed.
+        /// </summary>
+        /// <param name="imageName"> Name of image that will be processed. </param>
+        private void LoadPicture(string imageName)
+        {
+            try
+            {
+                _bitmap = new Bitmap(Image.FromFile(imageName));
+
+                textBox1.Text = openFileDialog1.FileName;
+
+                picture.Image = _bitmap;
+            }
+            catch (Exception exception)
+            {
+                MessageBox.Show(exception.Message);
+                textBox1.Text = string.Empty;
+            }
+        }
+
+        #endregion
     }
 }
