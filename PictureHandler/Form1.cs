@@ -13,7 +13,9 @@ namespace PictureHandler
 {
     public partial class Form1 : Form
     {
-        Bitmap bitmap;
+        private Bitmap bitmap;
+        private long elapsedTimeWorking;
+        private const int indexsColorBlack = 0;
 
         public Form1()
         {
@@ -45,74 +47,81 @@ namespace PictureHandler
 
         private void button2_Click(object sender, EventArgs e)
         {
-            //ChangePicture();
-            //Median
             MedianFiltering(bitmap);
-        }
-
-        private void ChangePicture()
-        {
-            Bitmap result = new Bitmap(bitmap);
-            for (int y = 0; y < bitmap.Height; y++)
-            {
-                for (int x = 0; x < bitmap.Width; x++)
-                {
-                    Color pixel = bitmap.GetPixel(x, y);
-                    if(checkBox1.Checked)
-                    {
-                        pixel = ChangeGrayScale(pixel);
-                    }
-                    result.SetPixel(x, y, pixel);
-                }
-            }
-            picture.Image = result;
-        }
-
-        private Color ChangeGrayScale(Color pixel)
-        {
-            int avg = (pixel.R + pixel.G + pixel.B + 1) / 3;
-            return Color.FromArgb(avg, avg, avg);
+            elapsedTime.Text = elapsedTimeWorking.ToString();
         }
 
         private void MedianFiltering(Bitmap bm)
         {
-            var watch = Stopwatch.StartNew();
-            List<byte> termsList = new List<byte>();
+            Stopwatch stopwatch = Stopwatch.StartNew();
+            List<byte> redColors = new List<byte>();
+            List<byte> greenColors = new List<byte>();
+            List<byte> blueColors = new List<byte>();
 
-            byte[,] image = new byte[bm.Width, bm.Height];
-
-            //Convert to Grayscale
-            for (int i = 0; i < bm.Width; i++)
-            {
-                for (int j = 0; j < bm.Height; j++)
-                {
-                    var c = bm.GetPixel(i, j);
-                    byte gray = (byte)(.333 * c.R + .333 * c.G + .333 * c.B);
-                    image[i, j] = gray;
-                }
-            }
-
-            //applying Median Filtering 
+            // Applying Median Filtering.
             for (int i = 0; i <= bm.Width - 3; i++)
+            {
                 for (int j = 0; j <= bm.Height - 3; j++)
                 {
                     for (int x = i; x <= i + 2; x++)
+                    {
                         for (int y = j; y <= j + 2; y++)
                         {
-                            termsList.Add(image[x, y]);
+                            var currentColor = bm.GetPixel(x, y);
+                            redColors.Add(currentColor.R);
+                            greenColors.Add(currentColor.G);
+                            blueColors.Add(currentColor.B);
                         }
-                    byte[] terms = termsList.ToArray();
-                    termsList.Clear();
-                    Array.Sort<byte>(terms);
-                    Array.Reverse(terms);
-                    byte color = terms[4];
-                    bm.SetPixel(i + 1, j + 1, Color.FromArgb(color, color, color));
+                    }
+                    byte[] resultRedColours = redColors.ToArray();
+                    byte[] resultGreenColours = greenColors.ToArray();
+                    byte[] resultBlueColours = blueColors.ToArray();
+                    redColors.Clear();
+                    greenColors.Clear();
+                    blueColors.Clear();
+                    Array.Sort<byte>(resultRedColours);
+                    Array.Sort<byte>(resultGreenColours);
+                    Array.Sort<byte>(resultBlueColours);
+                    bm.SetPixel(i + 1, j + 1, Color.FromArgb(
+                        resultRedColours[4],
+                        resultGreenColours[4],
+                        resultBlueColours[4]));
                 }
+            }
+
+            // Set black color for edge pixels.
+            for (int x = 0; x < bm.Width; x++)
+            {
+                bm.SetPixel(x, 0, Color.FromArgb(
+                    indexsColorBlack, indexsColorBlack, indexsColorBlack));
+            }
+
+            for (int x = 0; x < bm.Width; x++)
+            {
+                bm.SetPixel(x, bm.Height - 1, Color.FromArgb(
+                    indexsColorBlack, indexsColorBlack, indexsColorBlack));
+            }
+
+            for (int y = 0; y < bm.Height; y++)
+            {
+                bm.SetPixel(0, y, Color.FromArgb(
+                    indexsColorBlack, indexsColorBlack, indexsColorBlack));
+            }
+
+            for (int y = 0; y < bm.Height; y++)
+            {
+                bm.SetPixel(bm.Width - 1, y, Color.FromArgb(
+                    indexsColorBlack, indexsColorBlack, indexsColorBlack));
+            }
 
             picture.Image = bm;
 
-            watch.Stop();
-            var elapsedMs = watch.ElapsedMilliseconds;
+            stopwatch.Stop();
+            elapsedTimeWorking = stopwatch.ElapsedMilliseconds;
+        }
+
+        private void label1_Click(object sender, EventArgs e)
+        {
         }
     }
 }
