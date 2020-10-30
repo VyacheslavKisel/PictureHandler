@@ -25,6 +25,8 @@ namespace PictureHandler
 
         private void MedianFiltering(Bitmap bitmap)
         {
+            // TODO: Create thread.
+
             var stopwatch = Stopwatch.StartNew();
 
             var redColors = new Collection<byte>();
@@ -32,10 +34,13 @@ namespace PictureHandler
             var blueColors = new Collection<byte>();
 
             // Applying median filtering.
-            for (var i = 0; i <= bitmap.Width - 3; i++)
+
+            // For all image pixels.
+            for(var i = 0; i <= bitmap.Width - 3; i++)
             {
                 for (var j = 0; j <= bitmap.Height - 3; j++)
                 {
+                    // Get 3x3 matrix.
                     for (var x = i; x <= i + 2; x++)
                     {
                         for (var y = j; y <= j + 2; y++)
@@ -45,28 +50,97 @@ namespace PictureHandler
                             redColors.Add(currentColor.R);
                             greenColors.Add(currentColor.G);
                             blueColors.Add(currentColor.B);
+
+                            //Task.WaitAll(task01, task02, task03);
+
+                            //redColors.Add(currentColor.R);
+                            //greenColors.Add(currentColor.G);
+                            //blueColors.Add(currentColor.B);
                         }
                     }
 
+                    //var taskWithRedColors = Task.Factory.StartNew(() =>
+                    //{
+                    //    var resultRedColors = redColors.ToArray();
+                    //    redColors.Clear();
+                    //    Array.Sort(resultRedColors);
+
+                    //    return resultRedColors;
+                    //});
+
+                    //var taskWithGreenColors = Task.Factory.StartNew(() =>
+                    //{
+                    //    var resultGreenColors = greenColors.ToArray();
+                    //    greenColors.Clear();
+                    //    Array.Sort(resultGreenColors);
+
+                    //    return resultGreenColors;
+                    //});
+
+                    //var taskWithBlueColors = Task.Factory.StartNew(() =>
+                    //{
+                    //    var resultBlueColors = blueColors.ToArray();
+                    //    blueColors.Clear();
+                    //    Array.Sort(resultBlueColors);
+
+                    //    return resultBlueColors;
+                    //});
+
+                    //bitmap.SetPixel(i + 1, j + 1, Color.FromArgb(
+                    //    taskWithRedColors.Result[4], taskWithGreenColors.Result[4], taskWithBlueColors.Result[4]));
+
                     var resultRedColors = redColors.ToArray();
-                    var resultGreenColors = greenColors.ToArray();
-                    var resultBlueColors = blueColors.ToArray();
-
                     redColors.Clear();
-                    greenColors.Clear();
-                    blueColors.Clear();
-
                     Array.Sort(resultRedColors);
+
+                    var resultGreenColors = greenColors.ToArray();
+                    greenColors.Clear();
                     Array.Sort(resultGreenColors);
+
+                    var resultBlueColors = blueColors.ToArray();
+                    blueColors.Clear();
                     Array.Sort(resultBlueColors);
 
-                    bitmap.SetPixel(i + 1, j + 1,
-                        Color.FromArgb(resultRedColors[4], resultGreenColors[4], resultBlueColors[4]));
+                    bitmap.SetPixel(i + 1, j + 1, Color.FromArgb(
+                        resultRedColors[4], resultGreenColors[4], resultBlueColors[4]));
                 }
             }
 
-            // TODO: Duplicate code.
             //Set black color for edge pixels.
+            //var task1 = Task.Factory.StartNew(() =>
+            //{
+            //    for (var index = 0; index < bitmap.Width; index++)
+            //    {
+            //        bitmap.SetPixel(index, 0, _blackColor);
+            //    }
+            //});
+
+            //var task2 = Task.Factory.StartNew(() =>
+            //{
+            //    for (var index = 0; index < bitmap.Width; index++)
+            //    {
+            //        bitmap.SetPixel(index, bitmap.Height - 1, _blackColor);
+            //    }
+            //});
+
+            //var task3 = Task.Factory.StartNew(() =>
+            //{
+            //    for (var index = 0; index < bitmap.Height; index++)
+            //    {
+            //        bitmap.SetPixel(0, index, _blackColor);
+            //    }
+            //});
+
+            //var task4 = Task.Factory.StartNew(() =>
+            //{
+            //    for (var index = 0; index < bitmap.Height; index++)
+            //    {
+            //        bitmap.SetPixel(bitmap.Width - 1, index, _blackColor);
+            //    }
+            //});
+
+            //Task.WaitAll(task1, task2, task3, task4);
+
             for (var index = 0; index < bitmap.Width; index++)
             {
                 bitmap.SetPixel(index, 0, _blackColor);
