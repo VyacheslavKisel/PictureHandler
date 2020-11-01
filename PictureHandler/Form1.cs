@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace PictureHandler
@@ -19,8 +20,8 @@ namespace PictureHandler
 
         private long _elapsedTimeWorking;
 
-        private const int ThreadsCount = 8;
-        private static readonly Thread[] Threads = new Thread[ThreadsCount];
+        private const int ThreadsCount = 50;
+        private static readonly Task[] Tasks = new Task[ThreadsCount];
 
         private readonly object _locker = new object();
 
@@ -107,17 +108,14 @@ namespace PictureHandler
                 var service = new ServiceInfoMedianFiltering(startHeight, finishHeight);
 
                 //ThreadPool.QueueUserWorkItem(obj => MedianFilteringThread(new ServiceInfoMedianFiltering(startHeight, finishHeight)));
-                Threads[i] = new Thread(() => MedianFilteringThread(service));
-                Threads[i].Start();
+                Tasks[i] = new Task(() => MedianFilteringThread(service));
+                Tasks[i].Start();
 
                 startHeight = finishHeight;
                 finishHeight += heightSegment;
             }
 
-            for (var i = 0; i < amountThreads; i++)
-            {
-                Threads[i].Join();
-            }
+            Task.WaitAll(Tasks);
 
             for (var index = 0; index < _bitmap.Width; index++)
             {
