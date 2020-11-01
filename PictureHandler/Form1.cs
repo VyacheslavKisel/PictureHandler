@@ -3,6 +3,8 @@ using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace PictureHandler
@@ -12,6 +14,8 @@ namespace PictureHandler
         private readonly Color _blackColor = Color.FromArgb(0, 0, 0);
         private Bitmap _bitmap;
         private long _elapsedTimeWorking;
+        private int amountThreads = 5;
+        private static object locker = new object();
 
         /// <summary>
         /// .ctor
@@ -23,11 +27,14 @@ namespace PictureHandler
 
         #region MedianFilteringLogic
 
-        private void MedianFiltering(Bitmap bitmap)
+        private void MedianFilteringThread(object obj)
         {
             // TODO: Create thread.
 
-            var stopwatch = Stopwatch.StartNew();
+            //var stopwatch = Stopwatch.StartNew();
+
+            int initialHeight = ((ServiceInfoMedianFiltering)obj).InitialHeight;
+            var finiteHeight = ((ServiceInfoMedianFiltering)obj).FiniteHeight;
 
             var redColors = new Collection<byte>();
             var greenColors = new Collection<byte>();
@@ -36,16 +43,20 @@ namespace PictureHandler
             // Applying median filtering.
 
             // For all image pixels.
-            for(var i = 0; i <= bitmap.Width - 3; i++)
+            for(var i = 0; i <= _bitmap.Width - 3; i++)
             {
-                for (var j = 0; j <= bitmap.Height - 3; j++)
+                for (var j = initialHeight; j <= finiteHeight - 3; j++)
                 {
                     // Get 3x3 matrix.
                     for (var x = i; x <= i + 2; x++)
                     {
                         for (var y = j; y <= j + 2; y++)
                         {
-                            var currentColor = bitmap.GetPixel(x, y);
+                            Color currentColor;
+                            lock(locker)
+                            {
+                                currentColor = _bitmap.GetPixel(x, y);
+                            }
 
                             redColors.Add(currentColor.R);
                             greenColors.Add(currentColor.G);
@@ -101,8 +112,11 @@ namespace PictureHandler
                     blueColors.Clear();
                     Array.Sort(resultBlueColors);
 
-                    bitmap.SetPixel(i + 1, j + 1, Color.FromArgb(
+                    lock(locker)
+                    {
+                        _bitmap.SetPixel(i + 1, j + 1, Color.FromArgb(
                         resultRedColors[4], resultGreenColors[4], resultBlueColors[4]));
+                    }                   
                 }
             }
 
@@ -141,33 +155,90 @@ namespace PictureHandler
 
             //Task.WaitAll(task1, task2, task3, task4);
 
-            for (var index = 0; index < bitmap.Width; index++)
+            //for (var index = 0; index < bitmap.Width; index++)
+            //{
+            //    bitmap.SetPixel(index, 0, _blackColor);
+            //}
+
+            //for (var index = 0; index < bitmap.Width; index++)
+            //{
+            //    bitmap.SetPixel(index, bitmap.Height - 1, _blackColor);
+            //}
+
+            //for (var index = 0; index < bitmap.Height; index++)
+            //{
+            //    bitmap.SetPixel(0, index, _blackColor);
+            //}
+
+            //for (var index = 0; index < bitmap.Height; index++)
+            //{
+            //    bitmap.SetPixel(bitmap.Width - 1, index, _blackColor);
+            //}
+
+            //stopwatch.Stop();
+            //_elapsedTimeWorking = stopwatch.ElapsedMilliseconds;
+
+            //picture.Image = _bitmap;
+        }
+
+        #endregion
+
+        private void MedianFiltering(int amountThreads)
+        {
+            var stopwatch = Stopwatch.StartNew();
+
+            var width = _bitmap.Width;
+            var height = _bitmap.Height;
+            var heightSegment = height / amountThreads;
+            var remainder = _bitmap.Height - (heightSegment * amountThreads);
+            var initialHeight = 0;
+            var finiteHeight = heightSegment;
+            var threads = new Thread[amountThreads];
+
+            for (int i = 0; i < amountThreads; i++)
             {
-                bitmap.SetPixel(index, 0, _blackColor);
+                if(i == 0)
+                {
+                    finiteHeight += remainder;
+                }
+
+                threads[i] = new Thread(new ParameterizedThreadStart(MedianFilteringThread));
+                threads[i].Start(new ServiceInfoMedianFiltering(initialHeight, finiteHeight));
+
+                initialHeight = finiteHeight;
+                finiteHeight += heightSegment;
             }
 
-            for (var index = 0; index < bitmap.Width; index++)
+            for (int i = 0; i < amountThreads; i++)
             {
-                bitmap.SetPixel(index, bitmap.Height - 1, _blackColor);
+                threads[i].Join();
             }
 
-            for (var index = 0; index < bitmap.Height; index++)
+            for (var index = 0; index < _bitmap.Width; index++)
             {
-                bitmap.SetPixel(0, index, _blackColor);
+                _bitmap.SetPixel(index, 0, _blackColor);
             }
 
-            for (var index = 0; index < bitmap.Height; index++)
+            for (var index = 0; index < _bitmap.Width; index++)
             {
-                bitmap.SetPixel(bitmap.Width - 1, index, _blackColor);
+                _bitmap.SetPixel(index, _bitmap.Height - 1, _blackColor);
+            }
+
+            for (var index = 0; index < _bitmap.Height; index++)
+            {
+                _bitmap.SetPixel(0, index, _blackColor);
+            }
+
+            for (var index = 0; index < _bitmap.Height; index++)
+            {
+                _bitmap.SetPixel(_bitmap.Width - 1, index, _blackColor);
             }
 
             stopwatch.Stop();
             _elapsedTimeWorking = stopwatch.ElapsedMilliseconds;
 
-            picture.Image = bitmap;
+            picture.Image = _bitmap;
         }
-
-        #endregion
 
         #region FormsEvents
 
@@ -193,7 +264,7 @@ namespace PictureHandler
             {
                 errorLabel.Visible = false;
 
-                MedianFiltering(_bitmap);
+                MedianFiltering(amountThreads);
 
                 elapsedTime.Text = _elapsedTimeWorking.ToString();
             }
@@ -204,6 +275,7 @@ namespace PictureHandler
         }
 
         #endregion
+
 
         #region HelperMethods
 
