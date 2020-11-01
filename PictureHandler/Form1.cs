@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Drawing;
 using System.Linq;
 using System.Threading;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace PictureHandler
@@ -13,9 +12,17 @@ namespace PictureHandler
     {
         private readonly Color _blackColor = Color.FromArgb(0, 0, 0);
         private Bitmap _bitmap;
+
+        // TODO:
+        private int _width;
+
+
         private long _elapsedTimeWorking;
-        private int amountThreads = 5;
-        private static object locker = new object();
+
+        private const int ThreadsCount = 8;
+        private static readonly Thread[] Threads = new Thread[ThreadsCount];
+
+        private readonly object _locker = new object();
 
         /// <summary>
         /// .ctor
@@ -27,25 +34,19 @@ namespace PictureHandler
 
         #region MedianFilteringLogic
 
-        private void MedianFilteringThread(object obj)
+        private void MedianFilteringThread(ServiceInfoMedianFiltering obj)
         {
-            // TODO: Create thread.
-
-            //var stopwatch = Stopwatch.StartNew();
-
-            int initialHeight = ((ServiceInfoMedianFiltering)obj).InitialHeight;
-            var finiteHeight = ((ServiceInfoMedianFiltering)obj).FiniteHeight;
+            var startHeight =  obj.InitialHeight;
+            var finalHeight = obj.FiniteHeight;
 
             var redColors = new Collection<byte>();
             var greenColors = new Collection<byte>();
             var blueColors = new Collection<byte>();
 
-            // Applying median filtering.
-
             // For all image pixels.
-            for(var i = 0; i <= _bitmap.Width - 3; i++)
+            for(var i = 0; i <= _width - 3; i++)
             {
-                for (var j = initialHeight; j <= finiteHeight - 3; j++)
+                for (var j = startHeight; j <= finalHeight - 3; j++)
                 {
                     // Get 3x3 matrix.
                     for (var x = i; x <= i + 2; x++)
@@ -53,7 +54,7 @@ namespace PictureHandler
                         for (var y = j; y <= j + 2; y++)
                         {
                             Color currentColor;
-                            lock(locker)
+                            lock(_locker)
                             {
                                 currentColor = _bitmap.GetPixel(x, y);
                             }
@@ -61,44 +62,8 @@ namespace PictureHandler
                             redColors.Add(currentColor.R);
                             greenColors.Add(currentColor.G);
                             blueColors.Add(currentColor.B);
-
-                            //Task.WaitAll(task01, task02, task03);
-
-                            //redColors.Add(currentColor.R);
-                            //greenColors.Add(currentColor.G);
-                            //blueColors.Add(currentColor.B);
                         }
                     }
-
-                    //var taskWithRedColors = Task.Factory.StartNew(() =>
-                    //{
-                    //    var resultRedColors = redColors.ToArray();
-                    //    redColors.Clear();
-                    //    Array.Sort(resultRedColors);
-
-                    //    return resultRedColors;
-                    //});
-
-                    //var taskWithGreenColors = Task.Factory.StartNew(() =>
-                    //{
-                    //    var resultGreenColors = greenColors.ToArray();
-                    //    greenColors.Clear();
-                    //    Array.Sort(resultGreenColors);
-
-                    //    return resultGreenColors;
-                    //});
-
-                    //var taskWithBlueColors = Task.Factory.StartNew(() =>
-                    //{
-                    //    var resultBlueColors = blueColors.ToArray();
-                    //    blueColors.Clear();
-                    //    Array.Sort(resultBlueColors);
-
-                    //    return resultBlueColors;
-                    //});
-
-                    //bitmap.SetPixel(i + 1, j + 1, Color.FromArgb(
-                    //    taskWithRedColors.Result[4], taskWithGreenColors.Result[4], taskWithBlueColors.Result[4]));
 
                     var resultRedColors = redColors.ToArray();
                     redColors.Clear();
@@ -112,106 +77,46 @@ namespace PictureHandler
                     blueColors.Clear();
                     Array.Sort(resultBlueColors);
 
-                    lock(locker)
+                    lock(_locker)
                     {
                         _bitmap.SetPixel(i + 1, j + 1, Color.FromArgb(
                         resultRedColors[4], resultGreenColors[4], resultBlueColors[4]));
                     }                   
                 }
             }
-
-            //Set black color for edge pixels.
-            //var task1 = Task.Factory.StartNew(() =>
-            //{
-            //    for (var index = 0; index < bitmap.Width; index++)
-            //    {
-            //        bitmap.SetPixel(index, 0, _blackColor);
-            //    }
-            //});
-
-            //var task2 = Task.Factory.StartNew(() =>
-            //{
-            //    for (var index = 0; index < bitmap.Width; index++)
-            //    {
-            //        bitmap.SetPixel(index, bitmap.Height - 1, _blackColor);
-            //    }
-            //});
-
-            //var task3 = Task.Factory.StartNew(() =>
-            //{
-            //    for (var index = 0; index < bitmap.Height; index++)
-            //    {
-            //        bitmap.SetPixel(0, index, _blackColor);
-            //    }
-            //});
-
-            //var task4 = Task.Factory.StartNew(() =>
-            //{
-            //    for (var index = 0; index < bitmap.Height; index++)
-            //    {
-            //        bitmap.SetPixel(bitmap.Width - 1, index, _blackColor);
-            //    }
-            //});
-
-            //Task.WaitAll(task1, task2, task3, task4);
-
-            //for (var index = 0; index < bitmap.Width; index++)
-            //{
-            //    bitmap.SetPixel(index, 0, _blackColor);
-            //}
-
-            //for (var index = 0; index < bitmap.Width; index++)
-            //{
-            //    bitmap.SetPixel(index, bitmap.Height - 1, _blackColor);
-            //}
-
-            //for (var index = 0; index < bitmap.Height; index++)
-            //{
-            //    bitmap.SetPixel(0, index, _blackColor);
-            //}
-
-            //for (var index = 0; index < bitmap.Height; index++)
-            //{
-            //    bitmap.SetPixel(bitmap.Width - 1, index, _blackColor);
-            //}
-
-            //stopwatch.Stop();
-            //_elapsedTimeWorking = stopwatch.ElapsedMilliseconds;
-
-            //picture.Image = _bitmap;
         }
-
-        #endregion
 
         private void MedianFiltering(int amountThreads)
         {
             var stopwatch = Stopwatch.StartNew();
 
-            var width = _bitmap.Width;
             var height = _bitmap.Height;
+            var startHeight = 0;
             var heightSegment = height / amountThreads;
-            var remainder = _bitmap.Height - (heightSegment * amountThreads);
-            var initialHeight = 0;
-            var finiteHeight = heightSegment;
-            var threads = new Thread[amountThreads];
+            var finishHeight = heightSegment;
+            var remainder = _bitmap.Height - heightSegment * amountThreads;
 
-            for (int i = 0; i < amountThreads; i++)
+            for (var i = 0; i < amountThreads; i++)
             {
-                if(i == 0)
+                // TODO:
+                if (i == 0)
                 {
-                    finiteHeight += remainder;
+                    finishHeight += remainder;
                 }
 
-                threads[i] = new Thread(new ParameterizedThreadStart(MedianFilteringThread));
-                threads[i].Start(new ServiceInfoMedianFiltering(initialHeight, finiteHeight));
+                var service = new ServiceInfoMedianFiltering(startHeight, finishHeight);
 
-                initialHeight = finiteHeight;
-                finiteHeight += heightSegment;
+                //ThreadPool.QueueUserWorkItem(obj => MedianFilteringThread(new ServiceInfoMedianFiltering(startHeight, finishHeight)));
+                Threads[i] = new Thread(() => MedianFilteringThread(service));
+                Threads[i].Start();
+
+                startHeight = finishHeight;
+                finishHeight += heightSegment;
             }
 
-            for (int i = 0; i < amountThreads; i++)
+            for (var i = 0; i < amountThreads; i++)
             {
-                threads[i].Join();
+                Threads[i].Join();
             }
 
             for (var index = 0; index < _bitmap.Width; index++)
@@ -239,6 +144,8 @@ namespace PictureHandler
 
             picture.Image = _bitmap;
         }
+        
+        #endregion
 
         #region FormsEvents
 
@@ -264,7 +171,7 @@ namespace PictureHandler
             {
                 errorLabel.Visible = false;
 
-                MedianFiltering(amountThreads);
+                MedianFiltering(ThreadsCount);
 
                 elapsedTime.Text = _elapsedTimeWorking.ToString();
             }
@@ -275,7 +182,6 @@ namespace PictureHandler
         }
 
         #endregion
-
 
         #region HelperMethods
 
@@ -288,6 +194,9 @@ namespace PictureHandler
             try
             {
                 _bitmap = new Bitmap(Image.FromFile(imageName));
+
+                // TODO:
+                _width = _bitmap.Width;
 
                 textBox1.Text = openFileDialog1.FileName;
 
